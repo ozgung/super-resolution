@@ -88,6 +88,13 @@ def checkpoint(epoch):
     torch.save(model, model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
+
+from torchviz import make_dot
+
+
+
+make_dot(model(torch.rand((3,255,255))),dict(model.named_parameters()))
+
 for epoch in range(1, opt.nEpochs + 1):
     train(epoch)
     test()
