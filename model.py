@@ -31,7 +31,7 @@ import torch.nn.functional as F
 #         init.orthogonal(self.conv4.weight)
 
 class DBPN(nn.Module):
-    def __init__(self, T, n_0, n_r, ):
+    def __init__(self, T, n_0, n_r, ch=3):
         super(DBPN, self).__init__()
 
         self.ml = nn.ModuleList()
@@ -39,7 +39,7 @@ class DBPN(nn.Module):
         self.H_list = []
 
         # Inital feature extraction (sec. 3.3.1)
-        self.ml.append(nn.Conv2d(3, n_0, 3)) # N,3,H,W -> N,n_0,H,W
+        self.ml.append(nn.Conv2d(ch, n_0, 3)) # N,ch,H,W -> N,n_0,H,W
         self.ml.append(nn.Conv2d(n_0, n_r, 1)) # N,n_0,H,W -> N,n_r,H,W
 
         # Back projection stages (sec. 3.3.2)
@@ -50,12 +50,29 @@ class DBPN(nn.Module):
 
         # Reconstruction (sec. 3.3.3)
         # TODO: concat T tensors
-        self.ml.append(nn.Conv2d(T*n_r, 3, 3)) # N, T*n_r,H,W -> N,3,H,W
+        self.ml.append(nn.Conv2d(T*n_r, ch, 3)) # N, T*n_r,H,W -> N,ch,H,W
 
 
     def forward(self, x):
-        for layer in self.ml:
-            x=layer(x)
+        # Feature Extraction layers
+        x = self.ml[0](x)
+        x = self.ml[1](x)
+        # reconstruction layerls
+        i=2
+        self.H_list = []
+        for stage in range(T-1):
+            x = self.ml[i](x) # upprojection
+            self.H_list.append(x)
+            x =  self.ml[i](x)# downprojection
+            i += 2
+        x = self.ml[i+1](x) # last upprojection
+        self.H_list.append(x)
+
+        # reconstruction layer
+        # concat activations in H_list
+        x = torch.cat(self.H_list)
+        x = self.ml[-1](x)
+
         return x
 
 
@@ -69,12 +86,16 @@ class UpProjectionUnit(nn.Module):
 
         self.H_out = None
 
+        self.prelu0 = nn.PReLU()
+        self.prelu1 = nn.PReLU()
+        self.prelu2 = nn.PReLU()
+
     def forward(self, x):
         L_prev = x
-        H_0 = F.prelu(self.deconv0(x))
-        L_0 = F.prelu(self.conv0(H_0))
+        H_0 = self.prelu0(self.deconv0(x))
+        L_0 = self.prelu1(self.conv0(H_0))
         residual = L_0 - L_prev
-        H_1 = F.prelu(self.deconv1(residual))
+        H_1 = self.prelu2(self.deconv1(residual))
         x = H_0 + H_1
         self.H_out = x
         return x
@@ -89,12 +110,16 @@ class DownProjectionUnit(nn.Module):
 
         self.L_out = None
 
+        self.prelu0 = nn.PReLU()
+        self.prelu1 = nn.PReLU()
+        self.prelu2 = nn.PReLU()
+
     def forward(self, x):
         H = x
-        L_0 = F.prelu(self.conv0(x))
-        H_0 = F.prelu(self.deconv0(x))
+        L_0 = self.prelu0(self.conv0(x))
+        H_0 = self.prelu1(self.deconv0(L_0))
         residual = H_0 - H
-        L_1 = F.prelu(self.conv1(residual))
+        L_1 = self.prelu2(self.conv1(residual))
         x = L_0 + L_1
         self.L_out = x
         return x
