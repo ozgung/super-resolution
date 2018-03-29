@@ -52,15 +52,20 @@ class DBPN(nn.Module):
         # TODO: concat T tensors
         self.ml.append(nn.Conv2d(T*n_r, ch, 3)) # N, T*n_r,H,W -> N,ch,H,W
 
+        self.T = T
+        self.n_0 = n_0
+        self.n_r = n_r
+        self.ch = ch
+
 
     def forward(self, x):
         # Feature Extraction layers
-        x = self.ml[0](x)
-        x = self.ml[1](x)
+        x = self.ml[0](x) # 32x3x28x28 -> 32x128x126x126
+        x = self.ml[1](x) # 32x128x126x126 ->
         # reconstruction layerls
         i=2
         self.H_list = []
-        for stage in range(T-1):
+        for stage in range(self.T-1):
             x = self.ml[i](x) # upprojection
             self.H_list.append(x)
             x =  self.ml[i](x)# downprojection
