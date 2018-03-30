@@ -35,12 +35,12 @@ model_params = s_rgb_params
 model = DBPN(**model_params)
 print(model)
 
-cuda = False
+cuda = True
 
 print('===> Loading datasets')
 upscale_factor = 2
 nthreads = 4
-batchSize = 32
+batchSize = 2
 
 if model_params['ch'] == 1:
     convert_gray=True

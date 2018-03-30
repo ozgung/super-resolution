@@ -1,3 +1,4 @@
+from __future__ import print_function, division
 import torch
 import torch.nn as nn
 import torch.nn.init as init
@@ -39,7 +40,7 @@ class DBPN(nn.Module):
         self.H_list = []
 
         # Inital feature extraction (sec. 3.3.1)
-        self.ml.append(nn.Conv2d(ch, n_0, 3)) # N,ch,H,W -> N,n_0,H,W
+        self.ml.append(nn.Conv2d(ch, n_0, 3, padding=1)) # N,ch,H,W -> N,n_0,H,W
         self.ml.append(nn.Conv2d(n_0, n_r, 1)) # N,n_0,H,W -> N,n_r,H,W
 
         # Back projection stages (sec. 3.3.2)
@@ -49,35 +50,37 @@ class DBPN(nn.Module):
         self.ml.append(UpProjectionUnit(n_r))
 
         # Reconstruction (sec. 3.3.3)
-        # TODO: concat T tensors
-        self.ml.append(nn.Conv2d(T*n_r, ch, 3)) # N, T*n_r,H,W -> N,ch,H,W
+        self.ml.append(nn.Conv2d(T*n_r, ch, 3, padding=1)) # N, T*n_r,H,W -> N,ch,H,W
 
         self.T = T
         self.n_0 = n_0
         self.n_r = n_r
         self.ch = ch
 
-
     def forward(self, x):
         # Feature Extraction layers
+        print("input, ", x.data.shape)
         x = self.ml[0](x) # 32x3x28x28 -> 32x128x126x126
         x = self.ml[1](x) # 32x128x126x126 ->
+        print("reconstruction input, ", x.data.shape)
         # reconstruction layerls
         i=2
         self.H_list = []
         for stage in range(self.T-1):
             x = self.ml[i](x) # upprojection
             self.H_list.append(x)
-            x =  self.ml[i](x)# downprojection
+            x =  self.ml[i+1](x)# downprojection
             i += 2
-        x = self.ml[i+1](x) # last upprojection
+        x = self.ml[i](x) # last upprojection
         self.H_list.append(x)
+        print("activation output saved: ", x.data.shape)
 
         # reconstruction layer
         # concat activations in H_list
-        x = torch.cat(self.H_list)
+        x = torch.cat(self.H_list, dim=1)
+        print("concatenated activations output, ", x.data.shape)
         x = self.ml[-1](x)
-
+        print("output, ", x.data.shape)
         return x
 
 
